@@ -1,14 +1,19 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import analyzeRoute from './routes/analyzeRoute'
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = 8000; //process.env.PORT will be added later 
 
 app.use(cors());
 app.use(express.json());
+
+// Register routes
+app.use('/api',analyzeRoute)
+
 
 app.get('/', (req, res) => {
   res.send('Refactor Radar Backend is running 🚀');
