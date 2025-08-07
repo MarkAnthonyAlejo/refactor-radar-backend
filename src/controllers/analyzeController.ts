@@ -13,13 +13,13 @@ export const analyzeCodeController = async (req: Request, res: Response) => {
 
     //Here we are Detecting the language from file extension 
     const language = detectLanguageFromFilename(filename);
-    if(!language) {
-      return res.status(422).json({error: `Unsuppoerted file type: ${filename}`})
+    if (!language) {
+      return res.status(422).json({ error: `Unsuppoerted file type: ${filename}` })
     }
 
     //This will get the services needed for the code to be returned
     //Checks if it has code, the filename and the type of coding language
-    const result = await analyzeCodeService(code, filename,language);
+    const result = await analyzeCodeService(code, filename, language);
 
     res.status(200).json(result);
   } catch (error) {

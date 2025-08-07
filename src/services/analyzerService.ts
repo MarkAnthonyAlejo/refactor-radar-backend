@@ -1,9 +1,20 @@
 //For the exsiting code now is just for testing on postman 
 //Extra code is needed for the service to work completed and is needing
 //further testing. 
+
+import { parseCodeToAST } from "../utils/treeSitterParser";
+
 export const analyzeCodeService = async (code: string, filename: string, language: string) => {
   // In the real version, you'll:
   // - Parse the code with TreeSitter
+   // ✅ Step 1: Parse code into AST
+  const ast = parseCodeToAST(code, language);
+
+  // ✅ Step 2: Example debug output (view structure of AST)
+  console.log('Output ->',ast.toString());
+
+  // ⏳ Step 3: You’ll analyze this AST in the next steps...
+
   // - Calculate metrics
   // - Ask GPT for suggestions
 
