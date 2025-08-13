@@ -1,13 +1,17 @@
 // utils/treeSitterParser.ts
 import Parser from 'tree-sitter';
 import JavaScript from 'tree-sitter-javascript';
+import TypeScript from 'tree-sitter-typescript/typescript';
+import TSX from 'tree-sitter-typescript/tsx';
 
 // Map language name to the correct grammar module
 const languageMap: Record<string, any> = {
-    javascript: JavaScript
+    javascript: JavaScript,
+    typescript: TypeScript,
+    tsx: TSX
 };
 
-export function parseCodeToAST(code: string, language: string) {
+export function parseCodeToAST(filename: string, code: string, language: string) {
     const parser = new Parser();
 
     const treeSitterLang = languageMap[language];

@@ -2,13 +2,17 @@
 //for now we will only use JS 
 
 import path from 'path'
+import { json } from 'stream/consumers';
 
 const extensionToLanguage: Record<string, string> = {
-    js: 'javascript'
+    js: 'javascript',
+    ts: 'typescript',
+    json: 'json'
     //will add more languages later
 };
 
 export function detectLanguageFromFilename(filename: string): string | null {
     const extension = path.extname(filename).toLowerCase().replace('.', '');
+    console.log('hello3 -> ', extensionToLanguage[extension])
     return extensionToLanguage[extension] || null;
 }

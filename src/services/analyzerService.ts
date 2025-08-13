@@ -3,15 +3,16 @@
 //further testing. 
 
 import { parseCodeToAST } from "../utils/treeSitterParser";
+import { astNodeToJSON } from "../utils/astNodeToJSON.";
 
 export const analyzeCodeService = async (code: string, filename: string, language: string) => {
   // In the real version, you'll:
   // - Parse the code with TreeSitter
    // ✅ Step 1: Parse code into AST
-  const ast = parseCodeToAST(code, language);
+  const ast = parseCodeToAST(filename,code, language);
 
   // ✅ Step 2: Example debug output (view structure of AST)
-  console.log('Output ->',ast.toString());
+ console.log(JSON.stringify(astNodeToJSON(ast), null, 2));
 
   // ⏳ Step 3: You’ll analyze this AST in the next steps...
 
