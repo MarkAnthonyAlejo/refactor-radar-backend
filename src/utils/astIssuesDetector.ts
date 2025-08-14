@@ -11,6 +11,7 @@ export function detectLongFunctions(node: SyntaxNode, threshold = 30): Issue[] {
   const issues: Issue[] = [];
 
   function traverse(n: SyntaxNode) {
+    // console.log('L.F1', n.type)
     if (n.type === 'function_declaration' || n.type === 'method_definition') {
       const body = n.childForFieldName('body');
       if (body) {

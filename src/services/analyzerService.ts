@@ -1,45 +1,40 @@
-//For the exsiting code now is just for testing on postman
-//Extra code is needed for the service to work completed and is needing
-//further testing.
-
+// services/analyzerService.ts
 import { parseCodeToAST } from '../utils/treeSitterParser';
-import { astNodeToJSON } from '../utils/astNodeToJSON.';
-import { detectLongFunctions } from '../utils/astIssuesDetector'; // <-- Add this import
+// import { astNodeToJSON } from '../utils/astNodeToJSON';
+import { detectLongFunctions } from '../utils/astIssuesDetector';
+import type { Issue } from '../utils/astIssuesDetector';
 
 export const analyzeCodeService = async (
-  code: string,
   filename: string,
+  code: string,
   language: string
 ) => {
-  // In the real version, you'll:
-  // - Parse the code with TreeSitter
   // ✅ Step 1: Parse code into AST
   const ast = parseCodeToAST(filename, code, language);
 
-  // Detect long functions
-  const longFunctionIssues = detectLongFunctions(ast);
+  // Debug: Dump top-level AST as string (optional)
+  console.log('AST rootNode string:', ast.toString());
 
-  // ✅ Step 2: Example debug output (view structure of AST)
-  console.log(JSON.stringify(astNodeToJSON(ast), null, 2));
-  console.log('Long function issues:', longFunctionIssues);
+  // ✅ Step 2: Detect long functions
+  const longFunctionIssues: Issue[] = detectLongFunctions(ast);
+  console.log('Detected long functions:', longFunctionIssues);
 
-  // ⏳ Step 3: You’ll analyze this AST in the next steps...
+  // Optional: Convert AST to JSON for debugging/visualization
+  // console.log(JSON.stringify(astNodeToJSON(ast), null, 2));
 
-  // - Calculate metrics
-  // - Ask GPT for suggestions
-
-  // Dummy response for now:
+  // ✅ Step 3: Return structured response including detected issues
   return {
     filename,
     language,
     originalCode: code,
-    refactoredCode: '// Refactored code would go here', // Dummy response for now
+    refactoredCode: '// Refactored code would go here', // placeholder
     suggestions: [
-      ...longFunctionIssues.map((issue) => issue.message),
+      ...longFunctionIssues.map((issue) => issue.message), // actual issues
       'Use const instead of let',
-      'Extract logic into a function',
-    ], // Dummy response for now
-    techDebtScore: 65, // Dummy response for now
-    diff: '// Diff output will go here', // Dummy response for now
+      'Extract logic into smaller functions',
+    ],
+    techDebtScore: 65, // placeholder
+    issues: longFunctionIssues, // send raw issues for frontend/extension use
+    diff: '// Diff output will go here', // placeholder
   };
 };
