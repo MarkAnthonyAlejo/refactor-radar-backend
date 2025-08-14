@@ -1,9 +1,10 @@
 // services/analyzerService.ts
 import { parseCodeToAST } from '../utils/treeSitterParser';
-// import { astNodeToJSON } from '../utils/astNodeToJSON';
 import { detectLongFunctions } from '../utils/astIssuesDetector';
-import type { Issue } from '../utils/astIssuesDetector';
 import { detectDeepNesting } from '../utils/astIssuesDetector';
+import { detectDuplicateCode } from '../utils/astIssuesDetector';
+import { detectDuplicateBlocks } from '../utils/astIssuesDetector';
+import type { Issue } from '../utils/astIssuesDetector';
 
 export const analyzeCodeService = async (
   filename: string,
@@ -16,18 +17,29 @@ export const analyzeCodeService = async (
   // Debug: Dump top-level AST as string (optional)
   console.log('AST rootNode string:', ast.toString());
 
-  // ✅ Step 2: Detect long functions, Deep nesting 
+  // ✅ Step 2: Detect long functions, Deep nesting, Code duplication
   const longFunctionIssues: Issue[] = detectLongFunctions(ast);
   //Console logs to test Long Functions 
   // console.log('Detected long functions:', longFunctionIssues);
   // console.log('L.F', code)
-  // console.log('Type lang', language)
+  // console.log('language: ', language)
 
   const deepNestingIssues = detectDeepNesting(ast);
   //Console logs to test Deep Nesting 
   // console.log('Detected deep nesting:', deepNestingIssues);
   // console.log('D.N', code)
-  // console.log('Type lang:', language)
+  //console.log('language: ', language)
+
+  const duplicateCodeIssues = detectDuplicateCode(ast); 
+  //Console logs to test Duplicated Code 
+  console.log('Duplicate Code: ', duplicateCodeIssues)
+  console.log('D.C: ', code)
+  console.log('language: ', language)
+
+  const duplicateBlockIssues = detectDuplicateBlocks(ast);
+  console.log('D.B.I', duplicateBlockIssues)
+  console.log('D.B.I code:', code)
+  console.log('language: ', language)
 
   // Optional: Convert AST to JSON for debugging/visualization
   // console.log(JSON.stringify(astNodeToJSON(ast), null, 2));
@@ -40,7 +52,9 @@ export const analyzeCodeService = async (
     refactoredCode: '// Refactored code would go here', // placeholder
     suggestions: [
       ...longFunctionIssues.map(i => i.message),
-      ...deepNestingIssues.map(i => i.message), // actual issues
+      ...deepNestingIssues.map(i => i.message),
+      ...duplicateCodeIssues.map(i => i.message),
+      ...duplicateBlockIssues, // actual issues
       'Use const instead of let',
       'Extract logic into smaller functions',
     ],
