@@ -9,8 +9,8 @@ export interface Issue {
   locations?: { start: any; end: any }[];
 }
 
-//Long Function Summary - This function looks at all the code in a file, finds every function, 
-// and checks if it’s too long. If a function is longer than 30 lines, 
+//Long Function Summary - This function looks at all the code in a file, finds every function,
+// and checks if it’s too long. If a function is longer than 30 lines,
 // it records it as a “problem” so we can fix it later.
 export function detectLongFunctions(node: SyntaxNode, threshold = 30): Issue[] {
   const issues: Issue[] = [];
@@ -84,7 +84,7 @@ export function detectDeepNesting(node: SyntaxNode, threshold = 3): Issue[] {
   return issues;
 }
 
-//Code duplication 
+//Code duplication
 
 // detectDuplicateCode = macro-level, function-level duplication.
 
@@ -101,7 +101,12 @@ export function detectDuplicateCode(
   root: SyntaxNode,
   { minLines = 4, minChars = 40 }: { minLines?: number; minChars?: number } = {}
 ): Issue[] {
-  type Block = { node: SyntaxNode; body: SyntaxNode; norm: string; lines: number };
+  type Block = {
+    node: SyntaxNode;
+    body: SyntaxNode;
+    norm: string;
+    lines: number;
+  };
   const blocks: Block[] = [];
 
   // Collect all function-like nodes
@@ -159,7 +164,10 @@ export function detectDuplicateCode(
 
 /* -------------------------- Duplicate Blocks (Partial) -------------------------- */
 // Detect repeated blocks inside function bodies
-export function detectDuplicateBlocks(node: SyntaxNode, minStatements = 2): Issue[] {
+export function detectDuplicateBlocks(
+  node: SyntaxNode,
+  minStatements = 2
+): Issue[] {
   const issues: Issue[] = [];
   const blockMap: { [hash: string]: SyntaxNode[] } = {};
 
@@ -170,7 +178,11 @@ export function detectDuplicateBlocks(node: SyntaxNode, minStatements = 2): Issu
   }
 
   function traverse(n: SyntaxNode) {
-    if (n.type === 'function_declaration' || n.type === 'method_definition' || n.type === 'statement_block') {
+    if (
+      n.type === 'function_declaration' ||
+      n.type === 'method_definition' ||
+      n.type === 'statement_block'
+    ) {
       if (n.namedChildCount >= minStatements) {
         const hash = serializeNode(n);
         if (!blockMap[hash]) blockMap[hash] = [n];
@@ -264,4 +276,79 @@ function placeholderFor(n: SyntaxNode): string | null {
     default:
       return null;
   }
+}
+
+/**
+ * Detect dead code:
+ * - Finds unreachable code after return, throw, break, or continue statements.
+ */
+export function detectDeadCode(node: SyntaxNode): Issue[] {
+  const issues: Issue[] = [];
+
+  function traverse(n: SyntaxNode) {
+    // Only check inside blocks
+    if (n.type === 'statement_block' || n.type === 'program') {
+      let unreachable = false;
+      for (const child of n.namedChildren) {
+        if (unreachable) {
+          issues.push({
+            type: 'dead-code',
+            message: 'Unreachable code detected',
+            start: child.startPosition,
+            end: child.endPosition,
+          });
+        }
+        // Mark as unreachable after these statements
+        if (
+          child.type === 'return_statement' ||
+          child.type === 'throw_statement' ||
+          child.type === 'break_statement' ||
+          child.type === 'continue_statement'
+        ) {
+          unreachable = true;
+        }
+      }
+    }
+    for (const child of n.children) traverse(child);
+  }
+
+  traverse(node);
+  return issues;
+}
+
+/**
+ * Detect bad naming:
+ * - Flags identifiers with names like 'foo', 'bar', 'tmp', 'data', 'test', or single-letter names (except i, j, k).
+ */
+export function detectBadNaming(node: SyntaxNode): Issue[] {
+  const issues: Issue[] = [];
+  const badNames = ['foo', 'bar', 'baz', 'tmp', 'data', 'test'];
+  const allowedSingle = ['i', 'j', 'k'];
+
+  function traverse(n: SyntaxNode) {
+    if (n.type === 'identifier' || n.type === 'property_identifier') {
+      const name = n.text.trim();
+      console.log('Identifier:', JSON.stringify(name));
+      // Only flag if in badNames or is a single letter not allowed
+      if (
+        badNames.includes(name) ||
+        (name.length === 1 && !allowedSingle.includes(name))
+      ) {
+        issues.push({
+          type: 'bad-naming',
+          message: `Suspicious variable name: "${name}"`,
+          start: n.startPosition,
+          end: n.endPosition,
+        });
+      }
+    }
+    for (const child of n.children) traverse(child);
+  }
+
+  traverse(node);
+  console.log(
+    'Bad naming issues:',
+    issues.map((i) => i.message)
+  );
+  return issues;
 }
