@@ -1,6 +1,6 @@
 import Parser from 'tree-sitter';
 import JavaScript from 'tree-sitter-javascript';
-import { detectDeadCode, detectBadNaming } from './astIssuesDetector';
+import { detectDeadCode, detectBadNaming } from '../utils/astIssuesDetector';
 
 //install jest:
 // npm install --save-dev jest ts-jest @types/jest
