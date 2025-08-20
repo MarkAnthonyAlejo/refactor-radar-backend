@@ -7,53 +7,121 @@ import {
   detectDuplicateBlocks,
   detectDeadCode,
   detectBadNaming,
-  detectCyclomaticComplexity, // ✅ NEW
+  detectCyclomaticComplexity,
+  type Issue,
 } from '../utils/astIssuesDetector';
+import 'dotenv/config'
+import OpenAI from 'openai';
 
-import type { Issue } from '../utils/astIssuesDetector';
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-export const analyzeCodeService = async (
+function safeParseJSON(raw: string) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+export const analyzeAndRefactorService = async (
   filename: string,
   code: string,
   language: string
 ) => {
-  // ✅ Step 1: Parse into AST
+  // 1 - AST analysis
   const ast = parseCodeToAST(filename, code, language);
-  console.log('AST rootNode string:', ast.toString());
 
-  // ✅ Step 2: Run all detectors
+  const longFunctionIssues = detectLongFunctions(ast);
+  const deepNestingIssues = detectDeepNesting(ast);
+  const duplicateCodeIssues = detectDuplicateCode(ast);
+  const duplicateBlockIssues = detectDuplicateBlocks(ast);
+  const deadCodeIssues = detectDeadCode(ast);
+  const badNamingIssues = detectBadNaming(ast);
+  const ccIssues = detectCyclomaticComplexity(ast);
 
-  const longFunctionIssues: Issue[] = detectLongFunctions(ast);
-  // console.log('Detected long functions:', longFunctionIssues);
+  const allIssues: Issue[] = [
+    ...longFunctionIssues,
+    ...deepNestingIssues,
+    ...duplicateCodeIssues,
+    ...duplicateBlockIssues,
+    ...deadCodeIssues,
+    ...badNamingIssues,
+    ...ccIssues,
+  ];
+  console.log('All Issues: ', allIssues)
 
-  const deepNestingIssues: Issue[] = detectDeepNesting(ast);
-  // console.log('Detected deep nesting:', deepNestingIssues);
+  // 2 - Prompt
+  const codeSummary = allIssues.map(i => `${i.type}: ${i.message}`).join('\n');
+  console.log('Code Summary for Ai: ', codeSummary)
+  const prompt = `
+You are an expert software engineer.
 
-  const duplicateCodeIssues: Issue[] = detectDuplicateCode(ast);
-  // console.log('Detected duplicate code:', duplicateCodeIssues);
+Analyze the following code:
 
-  const duplicateBlockIssues: Issue[] = detectDuplicateBlocks(ast);
-  // console.log('Detected duplicate blocks:', duplicateBlockIssues);
+\`\`\`
+${code}
+\`\`\`
 
-  const deadCodeIssues: Issue[] = detectDeadCode(ast);
-  // console.log('Detected dead code:', deadCodeIssues);
+Detected issues:
+${codeSummary || '(none)'}
 
-  const badNamingIssues: Issue[] = detectBadNaming(ast);
-  // console.log('Detected bad naming:', badNamingIssues);
+Tasks:
+1. Assign a technical debt score (0-100).
+2. Provide a refactored version of the code.
+3. Explain why you assigned this score.
 
-  // 🚀 NEW: Cyclomatic Complexity
-  const ccIssues: Issue[] = detectCyclomaticComplexity(ast, {
-    warnAt: 10,
-    noteAt: 5,
-  });
-  console.log('Detected cyclomatic complexity issues:', ccIssues);
+Respond strictly in JSON:
+{
+  "techDebtScore": number,
+  "refactoredCode": "string",
+  "explanation": "string"
+}
+`;
 
-  // ✅ Step 3: Return structured response
+  // 3 - Call OpenAI
+  let aiOutput: any = {
+    techDebtScore: 50,
+    refactoredCode: code,
+    explanation: 'Default fallback.',
+  };
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0,
+    });
+
+    const raw = response.choices[0]?.message?.content ?? '';
+    console.log('Raw Ai Response: ', raw);
+    const parsed = safeParseJSON(raw);
+    console.log('Parsed Ai Output: ', parsed)
+
+    if (parsed) {
+      aiOutput = parsed;
+    }
+  } catch (err) {
+    console.error('OpenAI error:', err);
+  }
+
+  // 4 - Return structured response
   return {
     filename,
     language,
     originalCode: code,
-    refactoredCode: '// Refactored code would go here',
+    techDebtScore: aiOutput.techDebtScore,
+    refactoredCode: aiOutput.refactoredCode,
+    explanation: aiOutput.explanation,
     suggestions: [
       ...longFunctionIssues.map(i => i.message),
       ...deepNestingIssues.map(i => i.message),
@@ -62,19 +130,8 @@ export const analyzeCodeService = async (
       ...deadCodeIssues.map(i => i.message),
       ...badNamingIssues.map(i => i.message),
       ...ccIssues.map(i => i.message),
-      'Use const instead of let',
-      'Extract logic into smaller functions',
     ],
-    techDebtScore: 65,
-    issues: [
-      ...longFunctionIssues,
-      ...deepNestingIssues,
-      ...duplicateCodeIssues,
-      ...duplicateBlockIssues,
-      ...deadCodeIssues,
-      ...badNamingIssues,
-      ...ccIssues,
-    ],
+    issues: allIssues,
     diff: '// Diff output will go here',
   };
 };
