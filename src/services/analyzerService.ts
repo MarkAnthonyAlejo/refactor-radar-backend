@@ -13,6 +13,9 @@ import {
 import 'dotenv/config'
 import OpenAI from 'openai';
 
+// 🔹 NEW: import diff generator
+import { createTwoFilesPatch } from 'diff';
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -58,11 +61,9 @@ export const analyzeAndRefactorService = async (
     ...badNamingIssues,
     ...ccIssues,
   ];
-  console.log('All Issues: ', allIssues)
 
   // 2 - Prompt
   const codeSummary = allIssues.map(i => `${i.type}: ${i.message}`).join('\n');
-  console.log('Code Summary for Ai: ', codeSummary)
   const prompt = `
 You are an expert software engineer.
 
@@ -103,9 +104,8 @@ Respond strictly in JSON:
     });
 
     const raw = response.choices[0]?.message?.content ?? '';
-    console.log('Raw Ai Response: ', raw);
     const parsed = safeParseJSON(raw);
-    console.log('Parsed Ai Output: ', parsed)
+    console.log('Ai parse resp: ', parsed)
 
     if (parsed) {
       aiOutput = parsed;
@@ -114,24 +114,71 @@ Respond strictly in JSON:
     console.error('OpenAI error:', err);
   }
 
-  // 4 - Return structured response
-  return {
-    filename,
-    language,
-    originalCode: code,
-    techDebtScore: aiOutput.techDebtScore,
-    refactoredCode: aiOutput.refactoredCode,
-    explanation: aiOutput.explanation,
-    suggestions: [
-      ...longFunctionIssues.map(i => i.message),
-      ...deepNestingIssues.map(i => i.message),
-      ...duplicateCodeIssues.map(i => i.message),
-      ...duplicateBlockIssues.map(i => i.message),
-      ...deadCodeIssues.map(i => i.message),
-      ...badNamingIssues.map(i => i.message),
-      ...ccIssues.map(i => i.message),
-    ],
-    issues: allIssues,
-    diff: '// Diff output will go here',
-  };
+  // 4 - Generate unified diff between original and refactored code
+  let diff = '';
+  try {
+    diff = createTwoFilesPatch(
+      filename,
+      `${filename} (refactored)`,
+      code,
+      aiOutput.refactoredCode || code
+    );
+  } catch (err) {
+    console.error('Diff generation error:', err);
+    diff = '// Failed to generate diff';
+  }
+
+  // 5 - Return structured response
+ return {
+  filename,
+  language,
+  originalCode: code,
+  techDebtScore: aiOutput.techDebtScore,
+  refactoredCode: aiOutput.refactoredCode,
+  explanation: aiOutput.explanation,
+  suggestions: [
+     ...longFunctionIssues.map(i => i.message),
+    ...deepNestingIssues.map(i => i.message),
+    ...duplicateCodeIssues.map(i => i.message),
+    ...duplicateBlockIssues.map(i => i.message),
+    ...deadCodeIssues.map(i => i.message),
+    ...badNamingIssues.map(i => i.message),
+  ],
+  issues: allIssues,
+  diff,  // the real unified diff string from step 9
 };
+
+};
+
+// Alternative version for return (optional but not needed)
+// return {
+//   filename,
+//   language,
+//   originalCode: code,
+//   techDebtScore: aiOutput.techDebtScore,
+//   refactoredCode: aiOutput.refactoredCode,
+//   explanation: aiOutput.explanation,
+//   suggestions: [
+//     ...longFunctionIssues.map(i => i.message),
+//     ...deepNestingIssues.map(i => i.message),
+//     ...
+//   ],
+//   issues: allIssues,
+//   diff,  // the real unified diff string from step 9
+// };
+
+//  language,
+//   techDebtScore: aiOutput.techDebtScore,
+//   issues: allIssues,  // full list of issues (type + message)
+//   complexity: ccIssues,  // per-function cyclomatic complexity info
+//   refactoredCode: aiOutput.refactoredCode,
+//   diff,  // generated unified diff
+//   suggestions: [
+//     ...longFunctionIssues.map(i => i.message),
+//     ...deepNestingIssues.map(i => i.message),
+//     ...duplicateCodeIssues.map(i => i.message),
+//     ...duplicateBlockIssues.map(i => i.message),
+//     ...deadCodeIssues.map(i => i.message),
+//     ...badNamingIssues.map(i => i.message),
+//   ],
+//   explanation: aiOutput.explanation,
