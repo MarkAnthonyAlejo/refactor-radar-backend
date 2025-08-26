@@ -32,9 +32,6 @@ export const analyzeCodeController = async (req: Request, res: Response) => {
 
       results.push(result);
 
-      console.log(`Processed file ${i + 1}: ${filePath}`);
-      console.log('Tech Debt Score:', result.techDebtScore);
-      console.log('Refactored Code Preview:', result.refactoredCode.substring(0, 100), '...');
     }
 
     res.json({ results });

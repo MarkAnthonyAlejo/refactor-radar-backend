@@ -105,7 +105,6 @@ Respond strictly in JSON:
 
     const raw = response.choices[0]?.message?.content ?? '';
     const parsed = safeParseJSON(raw);
-    console.log('Ai parse resp: ', parsed)
 
     if (parsed) {
       aiOutput = parsed;
