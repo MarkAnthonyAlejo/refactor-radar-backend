@@ -1,6 +1,5 @@
-// controller/analyzeCodeController.ts
+// controllers/analyzeController.ts
 import { Request, Response } from 'express';
-import fs from 'fs';
 import { analyzeAndRefactorService } from '../services/analyzerService';
 import { detectLanguageFromFilename } from '../utils/languageDetector';
 
@@ -9,29 +8,21 @@ export const analyzeCodeController = async (req: Request, res: Response) => {
     const results = [];
 
     for (let i = 0; i < req.body.length; i++) {
-      const filePath = req.body[i].filename;
+      const { filename, code } = req.body[i];
 
-      if (!filePath) {
-        return res.status(400).json({ error: 'Filename is required' });
+      if (!filename || !code) {
+        return res.status(400).json({ error: 'Filename and code are required' });
       }
 
-      const code = fs.readFileSync(filePath, 'utf-8');
-
-      if (!code) {
-        return res.status(400).json({ error: 'Code could not be read from file' });
-      }
-
-      const language = detectLanguageFromFilename(filePath);
-
+      const language = detectLanguageFromFilename(filename);
       if (!language) {
-        return res.status(422).json({ error: `Unsupported file type: ${filePath}` });
+        return res.status(422).json({ error: `Unsupported file type: ${filename}` });
       }
 
-      // Call new AI-powered analysis service
-      const result = await analyzeAndRefactorService(filePath, code, language);
+      // Call AI + AST analyzer
+      const result = await analyzeAndRefactorService(filename, code, language);
 
       results.push(result);
-
     }
 
     res.json({ results });
