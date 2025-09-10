@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 // Register routes
-app.use('/api',analyzeRoute)
+app.use('/api', analyzeRoute)
 
 
 app.get('/', (req, res) => {
