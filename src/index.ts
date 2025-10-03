@@ -6,7 +6,7 @@ import analyzeRoute from './routes/analyzeRoute'
 dotenv.config();
 
 const app = express();
-const PORT = 8000; //process.env.PORT will be added later 
+const PORT = process.env.PORT || 8000; //process.env.PORT will be added later 
 
 app.use(cors());
 app.use(express.json());
