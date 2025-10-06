@@ -7,53 +7,139 @@ import {
   detectDuplicateBlocks,
   detectDeadCode,
   detectBadNaming,
-  detectCyclomaticComplexity, // ✅ NEW
+  detectCyclomaticComplexity,
+  type Issue,
 } from '../utils/astIssuesDetector';
+import 'dotenv/config';
+import OpenAI from 'openai';
+import { createTwoFilesPatch } from 'diff';
 
-import type { Issue } from '../utils/astIssuesDetector';
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-export const analyzeCodeService = async (
+function safeParseJSON(raw: string) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+export const analyzeAndRefactorService = async (
   filename: string,
   code: string,
   language: string
 ) => {
-  // ✅ Step 1: Parse into AST
+  // 1 - AST analysis
   const ast = parseCodeToAST(filename, code, language);
-  console.log('AST rootNode string:', ast.toString());
 
-  // ✅ Step 2: Run all detectors
+  const longFunctionIssues = detectLongFunctions(ast);
+  const deepNestingIssues = detectDeepNesting(ast);
+  const duplicateCodeIssues = detectDuplicateCode(ast);
+  const duplicateBlockIssues = detectDuplicateBlocks(ast);
+  const deadCodeIssues = detectDeadCode(ast);
+  const badNamingIssues = detectBadNaming(ast);
+  const ccIssues = detectCyclomaticComplexity(ast);
 
-  const longFunctionIssues: Issue[] = detectLongFunctions(ast);
-  // console.log('Detected long functions:', longFunctionIssues);
+  const allIssues: Issue[] = [
+    ...longFunctionIssues,
+    ...deepNestingIssues,
+    ...duplicateCodeIssues,
+    ...duplicateBlockIssues,
+    ...deadCodeIssues,
+    ...badNamingIssues,
+    ...ccIssues,
+  ];
 
-  const deepNestingIssues: Issue[] = detectDeepNesting(ast);
-  // console.log('Detected deep nesting:', deepNestingIssues);
+  // 2 - Prompt
+  const codeSummary = allIssues.map(i => `${i.type}: ${i.message}`).join('\n');
 
-  const duplicateCodeIssues: Issue[] = detectDuplicateCode(ast);
-  // console.log('Detected duplicate code:', duplicateCodeIssues);
+  const prompt = `
+You are an expert software engineer.
 
-  const duplicateBlockIssues: Issue[] = detectDuplicateBlocks(ast);
-  // console.log('Detected duplicate blocks:', duplicateBlockIssues);
+Analyze the following code:
 
-  const deadCodeIssues: Issue[] = detectDeadCode(ast);
-  // console.log('Detected dead code:', deadCodeIssues);
+\`\`\`
+${code}
+\`\`\`
 
-  const badNamingIssues: Issue[] = detectBadNaming(ast);
-  // console.log('Detected bad naming:', badNamingIssues);
+Detected issues:
+${codeSummary || '(none)'}
 
-  // 🚀 NEW: Cyclomatic Complexity
-  const ccIssues: Issue[] = detectCyclomaticComplexity(ast, {
-    warnAt: 10,
-    noteAt: 5,
-  });
-  console.log('Detected cyclomatic complexity issues:', ccIssues);
+Tasks:
+1. Assign a technical debt score (0-100).
+2. Provide a refactored version of the code.
+3. Explain why you assigned this score.
 
-  // ✅ Step 3: Return structured response
+Respond strictly in JSON with these rules:
+{
+  "techDebtScore": number,
+  "refactoredCode": "string // ONLY runnable code, NO comments, NO duplicate function calls, NO extra newlines",
+  "explanation": "string"
+}
+
+Rules for refactoredCode:
+- Preserve original structure unless simplifying.
+- Do NOT include comments.
+- Do NOT duplicate existing function calls.
+- Make code clean, readable, and runnable.
+`;
+
+  // 3 - Call OpenAI
+  let aiOutput: any = {
+    techDebtScore: 50,
+    refactoredCode: code,
+    explanation: 'Default fallback.',
+  };
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0,
+    });
+
+    const raw = response.choices[0]?.message?.content ?? '';
+    const parsed = safeParseJSON(raw);
+
+    if (parsed) {
+      aiOutput = parsed;
+    }
+  } catch (err) {
+    console.error('OpenAI error:', err);
+  }
+
+  // 4 - Generate unified diff between original and refactored code
+  let diff = '';
+  try {
+    diff = createTwoFilesPatch(
+      filename,
+      `${filename} (refactored)`,
+      code,
+      aiOutput.refactoredCode || code
+    );
+  } catch (err) {
+    console.error('Diff generation error:', err);
+    diff = '// Failed to generate diff';
+  }
+
+  // 5 - Return structured response
   return {
     filename,
     language,
     originalCode: code,
-    refactoredCode: '// Refactored code would go here',
+    techDebtScore: aiOutput.techDebtScore,
+    refactoredCode: aiOutput.refactoredCode,
+    explanation: aiOutput.explanation,
     suggestions: [
       ...longFunctionIssues.map(i => i.message),
       ...deepNestingIssues.map(i => i.message),
@@ -61,20 +147,8 @@ export const analyzeCodeService = async (
       ...duplicateBlockIssues.map(i => i.message),
       ...deadCodeIssues.map(i => i.message),
       ...badNamingIssues.map(i => i.message),
-      ...ccIssues.map(i => i.message),
-      'Use const instead of let',
-      'Extract logic into smaller functions',
     ],
-    techDebtScore: 65,
-    issues: [
-      ...longFunctionIssues,
-      ...deepNestingIssues,
-      ...duplicateCodeIssues,
-      ...duplicateBlockIssues,
-      ...deadCodeIssues,
-      ...badNamingIssues,
-      ...ccIssues,
-    ],
-    diff: '// Diff output will go here',
+    issues: allIssues,
+    diff,
   };
 };

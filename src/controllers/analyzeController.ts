@@ -1,44 +1,32 @@
-// controller/analyzeCodeController.ts
+// controllers/analyzeController.ts
 import { Request, Response } from 'express';
-import fs from 'fs';
-import { analyzeCodeService } from '../services/analyzerService';
+import { analyzeAndRefactorService } from '../services/analyzerService';
 import { detectLanguageFromFilename } from '../utils/languageDetector';
 
 export const analyzeCodeController = async (req: Request, res: Response) => {
   try {
+    const results = [];
+    console.log('In the Controller')
+
     for (let i = 0; i < req.body.length; i++) {
-      const filePath = req.body[i].filename;
+      const { filename, code } = req.body[i];
 
-      if (!filePath) {
-        return res.status(400).json({ error: 'Filename is required' });
+      if (!filename || !code) {
+        return res.status(400).json({ error: 'Filename and code are required' });
       }
 
-      // Read the actual file contents
-      const code = fs.readFileSync(filePath, 'utf-8');
-
-      console.log(`File ${i + 1}: ${filePath}`);
-      console.log('Code preview:', code.substring(0, 100), '...'); // optional preview
-
-      if (!code) {
-        return res.status(400).json({ error: 'Code could not be read from file' });
-      }
-
-      // Detect language based on file extension
-      const language = detectLanguageFromFilename(filePath);
-      console.log('Detected language:', language);
-
+      const language = detectLanguageFromFilename(filename);
       if (!language) {
-        return res.status(422).json({ error: `Unsupported file type: ${filePath}` });
+        return res.status(422).json({ error: `Unsupported file type: ${filename}` });
       }
 
-      // Run the analysis service
-      const result = await analyzeCodeService(filePath, code, language);
+      // Call AI + AST analyzer
+      const result = await analyzeAndRefactorService(filename, code, language);
 
-      // Optional: log detected long functions from service
-      console.log('Analysis result:', result.suggestions);
+      results.push(result);
     }
 
-    res.json({ message: 'Files processed successfully' });
+    res.json({ results });
   } catch (error) {
     console.error('Error in analyzeCodeController:', error);
     res.status(500).json({ error: 'Internal Server Error' });
