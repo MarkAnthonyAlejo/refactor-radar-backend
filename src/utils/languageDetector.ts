@@ -13,6 +13,6 @@ const extensionToLanguage: Record<string, string> = {
 
 export function detectLanguageFromFilename(filename: string): string | null {
     const extension = path.extname(filename).toLowerCase().replace('.', '');
-    console.log('hello3 -> ', extensionToLanguage[extension])
+    // console.log('hello3 -> ', extensionToLanguage[extension])
     return extensionToLanguage[extension] || null;
 }

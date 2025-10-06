@@ -204,8 +204,6 @@ export function detectCyclomaticComplexity(root: SyntaxNode, { warnAt = 10, note
     const name = functionName(n);
     const level = score >= warnAt ? ' (high)' : score >= noteAt ? ' (moderate)' : ' (low)';
 
-    console.log(`Cyclomatic Complexity for function "${name}": ${score}${level}`);
-
     issues.push({
       type: 'cyclomatic-complexity',
       message: `Cyclomatic complexity for function "${name}" is ${score}${level}.`,
