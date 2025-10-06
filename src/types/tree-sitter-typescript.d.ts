@@ -1,3 +1,9 @@
-declare module 'tree-sitter-typescript';
-declare module 'tree-sitter-typescript/typescript';
-declare module 'tree-sitter-typescript/tsx';
+declare module "tree-sitter-typescript/typescript" {
+  const content: any;
+  export default content;
+}
+
+declare module "tree-sitter-typescript/tsx" {
+  const content: any;
+  export default content;
+}
