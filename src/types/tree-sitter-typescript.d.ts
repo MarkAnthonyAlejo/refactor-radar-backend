@@ -1,9 +1,6 @@
-declare module "tree-sitter-typescript/typescript" {
-  const content: any;
-  export default content;
-}
-
-declare module "tree-sitter-typescript/tsx" {
-  const content: any;
-  export default content;
-}
+// @ts-ignore
+import Parser from "tree-sitter";
+// @ts-ignore
+import TypeScript from "tree-sitter-typescript/typescript";
+// @ts-ignore
+import TSX from "tree-sitter-typescript/tsx";
