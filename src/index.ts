@@ -14,7 +14,7 @@ app.use(express.json());
 // Register routes
 app.use('/api', analyzeRoute)
 
-
+console.log('IM HERE');
 app.get('/', (req, res) => {
   res.send('Refactor Radar Backend is running 🚀');
 });
