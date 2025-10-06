@@ -6,6 +6,7 @@ import { detectLanguageFromFilename } from '../utils/languageDetector';
 export const analyzeCodeController = async (req: Request, res: Response) => {
   try {
     const results = [];
+    console.log('In the Controller')
 
     for (let i = 0; i < req.body.length; i++) {
       const { filename, code } = req.body[i];
