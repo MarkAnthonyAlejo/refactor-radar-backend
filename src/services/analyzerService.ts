@@ -1,4 +1,3 @@
-// services/analyzerService.ts
 import { parseCodeToAST } from '../utils/treeSitterParser';
 import {
   detectLongFunctions,
@@ -39,7 +38,7 @@ export const analyzeAndRefactorService = async (
   code: string,
   language: string
 ) => {
-  // 1 - AST analysis
+  // 1 - AST analysis: Gather all technical issues
   const ast = parseCodeToAST(filename, code, language);
 
   const longFunctionIssues = detectLongFunctions(ast);
@@ -50,6 +49,7 @@ export const analyzeAndRefactorService = async (
   const badNamingIssues = detectBadNaming(ast);
   const ccIssues = detectCyclomaticComplexity(ast);
 
+  // Combine all issues into one array for the prompt and the response
   const allIssues: Issue[] = [
     ...longFunctionIssues,
     ...deepNestingIssues,
@@ -60,7 +60,7 @@ export const analyzeAndRefactorService = async (
     ...ccIssues,
   ];
 
-  // 2 - Prompt
+  // 2 - Create the Prompt
   const codeSummary = allIssues.map(i => `${i.type}: ${i.message}`).join('\n');
 
   const prompt = `
@@ -72,19 +72,21 @@ Analyze the following code:
 ${code}
 \`\`\`
 
-Detected issues:
+Detected issues from static analysis:
 ${codeSummary || '(none)'}
 
 Tasks:
 1. Assign a technical debt score (0-100).
 2. Provide a refactored version of the code.
 3. Explain why you assigned this score.
+4. Provide a list of specific, actionable suggestions for further improvement.
 
 Respond strictly in JSON with these rules:
 {
   "techDebtScore": number,
   "refactoredCode": "string // ONLY runnable code, NO comments, NO duplicate function calls, NO extra newlines",
-  "explanation": "string"
+  "explanation": "string",
+  "suggestions": ["string"]
 }
 
 Rules for refactoredCode:
@@ -99,6 +101,7 @@ Rules for refactoredCode:
     techDebtScore: 50,
     refactoredCode: code,
     explanation: 'Default fallback.',
+    suggestions: []
   };
 
   try {
@@ -118,7 +121,7 @@ Rules for refactoredCode:
     console.error('OpenAI error:', err);
   }
 
-  // 4 - Generate unified diff between original and refactored code
+  // 4 - Generate unified diff
   let diff = '';
   try {
     diff = createTwoFilesPatch(
@@ -132,7 +135,13 @@ Rules for refactoredCode:
     diff = '// Failed to generate diff';
   }
 
-  // 5 - Return structured response
+  // 5 - Merge AST issues and AI suggestions into the final 'suggestions' array
+  // This ensures the frontend sees both technical (AST) and creative (AI) feedback
+  const finalSuggestions = Array.from(new Set([
+    ...(aiOutput.suggestions || []),
+    ...allIssues.map(i => i.message)
+  ]));
+
   return {
     filename,
     language,
@@ -140,14 +149,7 @@ Rules for refactoredCode:
     techDebtScore: aiOutput.techDebtScore,
     refactoredCode: aiOutput.refactoredCode,
     explanation: aiOutput.explanation,
-    suggestions: [
-      ...longFunctionIssues.map(i => i.message),
-      ...deepNestingIssues.map(i => i.message),
-      ...duplicateCodeIssues.map(i => i.message),
-      ...duplicateBlockIssues.map(i => i.message),
-      ...deadCodeIssues.map(i => i.message),
-      ...badNamingIssues.map(i => i.message),
-    ],
+    suggestions: finalSuggestions, // FIXED: Now contains all data!
     issues: allIssues,
     diff,
   };
