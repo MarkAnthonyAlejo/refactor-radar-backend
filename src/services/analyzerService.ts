@@ -17,6 +17,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+/**
+ * Enhanced JSON parser to handle cases where the AI 
+ * might wrap responses in markdown code blocks.
+ */
 function safeParseJSON(raw: string) {
   try {
     return JSON.parse(raw);
@@ -64,10 +68,9 @@ export const analyzeAndRefactorService = async (
   const codeSummary = allIssues.map(i => `${i.type}: ${i.message}`).join('\n');
 
   const prompt = `
-You are an expert software engineer.
+You are an expert software engineer. Respond ONLY in a valid JSON object.
 
 Analyze the following code:
-
 \`\`\`
 ${code}
 \`\`\`
@@ -81,18 +84,18 @@ Tasks:
 3. Explain why you assigned this score.
 4. Provide a list of specific, actionable suggestions for further improvement.
 
-Respond strictly in JSON with these rules:
+Respond strictly in JSON with this structure:
 {
   "techDebtScore": number,
-  "refactoredCode": "string // ONLY runnable code, NO comments, NO duplicate function calls, NO extra newlines",
+  "refactoredCode": "string",
   "explanation": "string",
   "suggestions": ["string"]
 }
 
 Rules for refactoredCode:
 - Preserve original structure unless simplifying.
-- Do NOT include comments.
-- Do NOT duplicate existing function calls.
+- DO NOT include comments.
+- DO NOT duplicate existing function calls.
 - Make code clean, readable, and runnable.
 `;
 
@@ -100,7 +103,7 @@ Rules for refactoredCode:
   let aiOutput: any = {
     techDebtScore: 50,
     refactoredCode: code,
-    explanation: 'Default fallback.',
+    explanation: 'Default fallback (AI failed to respond).',
     suggestions: []
   };
 
@@ -109,9 +112,17 @@ Rules for refactoredCode:
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0,
+      // Forces the model to output a valid JSON object
+      response_format: { type: "json_object" } 
     });
 
     const raw = response.choices[0]?.message?.content ?? '';
+    
+    // Check your Render/Terminal logs for this output!
+    console.log(`--- [AI Response for ${filename}] ---`);
+    console.log(raw);
+    console.log("--------------------------------------");
+
     const parsed = safeParseJSON(raw);
 
     if (parsed) {
@@ -136,7 +147,6 @@ Rules for refactoredCode:
   }
 
   // 5 - Merge AST issues and AI suggestions into the final 'suggestions' array
-  // This ensures the frontend sees both technical (AST) and creative (AI) feedback
   const finalSuggestions = Array.from(new Set([
     ...(aiOutput.suggestions || []),
     ...allIssues.map(i => i.message)
@@ -149,7 +159,7 @@ Rules for refactoredCode:
     techDebtScore: aiOutput.techDebtScore,
     refactoredCode: aiOutput.refactoredCode,
     explanation: aiOutput.explanation,
-    suggestions: finalSuggestions, // FIXED: Now contains all data!
+    suggestions: finalSuggestions,
     issues: allIssues,
     diff,
   };
